@@ -1,0 +1,54 @@
+# Lumora — Apache security headers
+# Requires: mod_headers, mod_rewrite, mod_mime (all standard on shared hosting)
+
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-zo8AKMEKihDfFeZo3stA1rPvtc30rbeyLY9re6pDDwg='; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'self'; media-src 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'"
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), xr-spatial-tracking=(), interest-cohort=()"
+  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header always set X-XSS-Protection "0"
+  # Strip the legacy header some proxies still add
+  Header unset X-Powered-By
+</IfModule>
+
+# Force HTTPS
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# No directory listings, no dotfile access
+Options -Indexes -MultiViews +FollowSymLinks
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# /.well-known/ must stay public (security.txt, ACME challenges, etc.) —
+# FilesMatch above only matches the leaf filename so this isn't strictly
+# necessary, but it's made explicit here to avoid any host-specific surprise.
+<IfModule mod_rewrite.c>
+  RewriteRule ^\.well-known/ - [L]
+</IfModule>
+
+# Correct MIME types (defense against MIME-sniffing when combined with nosniff)
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType text/css .css
+  AddType image/webp .webp
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
+# Long-lived caching for hashed/static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+</IfModule>
+
+ErrorDocument 404 /404.html
